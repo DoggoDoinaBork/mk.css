@@ -1,68 +1,121 @@
-<script>
-document.addEventListener("DOMContentLoaded", function () {
-    let snowContainer = document.createElement("div");
-    snowContainer.style.position = "fixed";
-    snowContainer.style.top = "0";
-    snowContainer.style.left = "0";
-    snowContainer.style.width = "100%";
-    snowContainer.style.height = "100%";
-    snowContainer.style.pointerEvents = "none";
-    snowContainer.style.zIndex = "1000";
-    document.body.appendChild(snowContainer);
-
-    let isScrolling = false;
-    let snowflakeInterval;
-
-    // Function to create a snowflake
-    function createSnowflake() {
-        if (!isScrolling) return;
-
-        let snowflake = document.createElement("div");
-        snowflake.innerHTML = "❄️";
-        snowflake.style.position = "absolute";
-        snowflake.style.fontSize = Math.random() * 15 + 10 + "px"; // Smaller snowflakes
-        snowflake.style.color = "rgba(255, 255, 255, 0.8)";
-        snowflake.style.left = Math.random() * window.innerWidth + "px";
-        snowflake.style.animation = `fall ${Math.random() * 5 + 5}s linear infinite`;
-        snowContainer.appendChild(snowflake);
-
-        setTimeout(() => snowflake.remove(), 10000); // Remove snowflake after 10s
+class Snowflake {
+    constructor(container) {
+        this.container = container;
+        this.element = document.createElement('div');
+        this.element.className = 'snowflake';
+        this.element.style.cssText = `
+            position: fixed;
+            color: white;
+            user-select: none;
+            z-index: 1000;
+            pointer-events: none;
+            animation: fall linear;
+        `;
+        this.element.innerHTML = '❄';
+        this.reset();
+        this.container.appendChild(this.element);
     }
 
-    // Function to start snowflakes on scroll
-    function startSnowflakes() {
-        if (!snowflakeInterval) {
-            snowflakeInterval = setInterval(createSnowflake, 500); // Spawn less frequently
+    reset() {
+        const startX = Math.random() * window.innerWidth;
+        const startY = -20;
+        const duration = 3 + Math.random() * 4;
+        const size = 10 + Math.random() * 20;
+
+        this.element.style.left = startX + 'px';
+        this.element.style.top = startY + 'px';
+        this.element.style.fontSize = size + 'px';
+        this.element.style.opacity = 0.5 + Math.random() * 0.5;
+        this.element.style.animationDuration = duration + 's';
+    }
+}
+
+class SnowfallManager {
+    constructor() {
+        this.container = document.createElement('div');
+        this.container.style.cssText = `
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100vw;
+            height: 100vh;
+            pointer-events: none;
+            z-index: 1000;
+        `;
+        document.body.appendChild(this.container);
+
+        this.snowflakes = [];
+        this.isSnowing = false;
+        this.lastScrollPosition = window.scrollY;
+        this.scrollThreshold = 50;
+        this.maxSnowflakes = 50;
+
+        // Add falling animation to stylesheet
+        const styleSheet = document.createElement('style');
+        styleSheet.textContent = `
+            @keyframes fall {
+                0% {
+                    transform: translateY(0) rotate(0deg);
+                }
+                100% {
+                    transform: translateY(${window.innerHeight + 20}px) rotate(360deg);
+                }
+            }
+        `;
+        document.head.appendChild(styleSheet);
+
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        let scrollTimeout;
+        window.addEventListener('scroll', () => {
+            const currentScroll = window.scrollY;
+            const scrollDifference = Math.abs(currentScroll - this.lastScrollPosition);
+
+            if (scrollDifference > this.scrollThreshold) {
+                this.startSnowing();
+                clearTimeout(scrollTimeout);
+                scrollTimeout = setTimeout(() => this.stopSnowing(), 2000);
+                this.lastScrollPosition = currentScroll;
+            }
+        });
+
+        // Clean up completed animations
+        setInterval(() => {
+            this.snowflakes = this.snowflakes.filter(snowflake => {
+                const rect = snowflake.element.getBoundingClientRect();
+                if (rect.top > window.innerHeight) {
+                    this.container.removeChild(snowflake.element);
+                    return false;
+                }
+                return true;
+            });
+        }, 1000);
+    }
+
+    startSnowing() {
+        if (!this.isSnowing) {
+            this.isSnowing = true;
+            this.addSnowflakes();
         }
     }
 
-    // Function to stop snowflakes
-    function stopSnowflakes() {
-        clearInterval(snowflakeInterval);
-        snowflakeInterval = null;
+    stopSnowing() {
+        this.isSnowing = false;
     }
 
-    // Scroll listener
-    window.addEventListener("scroll", function () {
-        isScrolling = true;
-        startSnowflakes();
+    addSnowflakes() {
+        if (!this.isSnowing) return;
 
-        // Stop snowflakes if no scroll activity after 500ms
-        clearTimeout(snowContainer.dataset.stopTimeout);
-        snowContainer.dataset.stopTimeout = setTimeout(() => {
-            isScrolling = false;
-            stopSnowflakes();
-        }, 500); // 500ms delay to detect scroll stop
-    });
-
-    // Add keyframe animation
-    let style = document.createElement("style");
-    style.innerHTML = `
-        @keyframes fall {
-            from { transform: translateY(-50px); }
-            to { transform: translateY(${window.innerHeight}px); }
+        if (this.snowflakes.length < this.maxSnowflakes) {
+            const snowflake = new Snowflake(this.container);
+            this.snowflakes.push(snowflake);
         }
-    `;
-    document.head.appendChild(style);
-});
-</script>
+
+        requestAnimationFrame(() => this.addSnowflakes());
+    }
+}
+
+// Initialize the snowfall
+const snowfall = new SnowfallManager();
