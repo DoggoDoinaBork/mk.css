@@ -1,6 +1,11 @@
-document.addEventListener('DOMContentLoaded', () => {
+// Wait for window to load
+window.onload = function() {
+    // Check if we're on the right page that has the elements we need
+    if (!document.body) return;
+
     class Snowflake {
         constructor(container) {
+            if (!container) return;
             this.container = container;
             this.element = document.createElement('div');
             this.element.className = 'snowflake';
@@ -33,52 +38,73 @@ document.addEventListener('DOMContentLoaded', () => {
 
     class SnowfallManager {
         constructor() {
-            this.container = document.createElement('div');
-            this.container.style.cssText = `
-                position: fixed;
-                top: 0;
-                left: 0;
-                width: 100vw;
-                height: 100vh;
-                pointer-events: none;
-                z-index: 1000;
-            `;
-            document.body.appendChild(this.container);
-
-            this.snowflakes = [];
-            this.maxSnowflakes = 50;
-
-            // Add falling animation to stylesheet
-            const styleSheet = document.createElement('style');
-            styleSheet.textContent = `
-                @keyframes fall {
-                    0% {
-                        transform: translateY(0) rotate(0deg);
-                    }
-                    100% {
-                        transform: translateY(${window.innerHeight + 20}px) rotate(360deg);
-                    }
+            // Check if we can create the container
+            try {
+                this.container = document.createElement('div');
+                if (!this.container) return;
+                
+                this.container.style.cssText = `
+                    position: fixed;
+                    top: 0;
+                    left: 0;
+                    width: 100vw;
+                    height: 100vh;
+                    pointer-events: none;
+                    z-index: 1000;
+                `;
+                
+                // Only append if body exists
+                if (document.body) {
+                    document.body.appendChild(this.container);
+                } else {
+                    console.log('Body not found, waiting for DOM...');
+                    return;
                 }
-            `;
-            document.head.appendChild(styleSheet);
 
-            // Start the animation loop
-            this.animate();
-            this.cleanup();
+                this.snowflakes = [];
+                this.maxSnowflakes = 50;
+
+                // Add falling animation to stylesheet
+                const styleSheet = document.createElement('style');
+                styleSheet.textContent = `
+                    @keyframes fall {
+                        0% {
+                            transform: translateY(0) rotate(0deg);
+                        }
+                        100% {
+                            transform: translateY(${window.innerHeight + 20}px) rotate(360deg);
+                        }
+                    }
+                `;
+                document.head.appendChild(styleSheet);
+
+                // Start the animation loop
+                this.animate();
+                this.cleanup();
+            } catch (error) {
+                console.log('Error initializing snowfall:', error);
+            }
         }
 
         animate() {
+            if (!this.container) return;
+            
             if (this.snowflakes.length < this.maxSnowflakes) {
                 const snowflake = new Snowflake(this.container);
-                this.snowflakes.push(snowflake);
+                if (snowflake.element) {
+                    this.snowflakes.push(snowflake);
+                }
             }
 
             requestAnimationFrame(() => this.animate());
         }
 
         cleanup() {
+            if (!this.container) return;
+            
             setInterval(() => {
                 this.snowflakes = this.snowflakes.filter(snowflake => {
+                    if (!snowflake.element) return false;
                     const rect = snowflake.element.getBoundingClientRect();
                     if (rect.top > window.innerHeight) {
                         this.container.removeChild(snowflake.element);
@@ -90,6 +116,18 @@ document.addEventListener('DOMContentLoaded', () => {
         }
     }
 
-    // Initialize the snowfall
-    const snowfall = new SnowfallManager();
-});
+    // Try to initialize with retry mechanism
+    let retryCount = 0;
+    const maxRetries = 5;
+
+    function initSnowfall() {
+        if (document.body) {
+            const snowfall = new SnowfallManager();
+        } else if (retryCount < maxRetries) {
+            retryCount++;
+            setTimeout(initSnowfall, 100);
+        }
+    }
+
+    initSnowfall();
+};
