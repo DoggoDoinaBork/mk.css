@@ -1,9 +1,8 @@
-(function() {
-    function init() {
-        if (!document || !document.body) {
-            setTimeout(init, 100);
-            return;
-        }
+window.addEventListener('load', function() {
+    // Wait for a brief moment after load to ensure everything is ready
+    setTimeout(() => {
+        // Double check that document and body exist
+        if (!document || !document.body) return;
 
         class Snowflake {
             constructor(container) {
@@ -11,7 +10,6 @@
                 this.element = document.createElement('div');
                 this.element.className = 'snowflake';
                 
-                // Array of winter/holiday colors
                 this.colors = [
                     '#ffffff', // White
                     '#00fff2', // Light Blue
@@ -33,15 +31,12 @@
                 this.reset();
                 this.container.appendChild(this.element);
                 
-                // Start color changing animation
                 this.changeColor();
             }
 
             changeColor() {
                 const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
                 this.element.style.color = randomColor;
-                
-                // Change color every 2-4 seconds
                 setTimeout(() => this.changeColor(), 2000 + Math.random() * 2000);
             }
 
@@ -63,42 +58,57 @@
 
         class SnowfallManager {
             constructor() {
-                const container = document.createElement('div');
-                container.style.cssText = `
-                    position: fixed;
-                    top: 0;
-                    left: 0;
-                    width: 100vw;
-                    height: 100vh;
-                    pointer-events: none;
-                    z-index: 99999;
-                `;
+                // Create and append the container first
+                this.setupContainer();
                 
-                if (document.body) {
-                    document.body.insertAdjacentElement('beforeend', container);
-                    this.container = container;
+                if (this.container) {
                     this.snowflakes = [];
                     this.maxSnowflakes = 50;
                     this.isSnowing = false;
                     this.lastScrollPosition = window.scrollY;
                     this.scrollThreshold = 50;
 
-                    const styleSheet = document.createElement('style');
-                    styleSheet.textContent = `
-                        @keyframes fall {
-                            0% {
-                                transform: translateY(0) rotate(0deg);
-                            }
-                            100% {
-                                transform: translateY(${window.innerHeight + 20}px) rotate(360deg);
-                            }
-                        }
-                    `;
-                    document.head.appendChild(styleSheet);
-
+                    this.setupStyles();
                     this.setupScrollListener();
                     this.cleanup();
                 }
+            }
+
+            setupContainer() {
+                try {
+                    this.container = document.createElement('div');
+                    this.container.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        pointer-events: none;
+                        z-index: 99999;
+                    `;
+                    
+                    if (document.body) {
+                        document.body.appendChild(this.container);
+                    }
+                } catch (error) {
+                    console.log('Error setting up snow container:', error);
+                    this.container = null;
+                }
+            }
+
+            setupStyles() {
+                const styleSheet = document.createElement('style');
+                styleSheet.textContent = `
+                    @keyframes fall {
+                        0% {
+                            transform: translateY(0) rotate(0deg);
+                        }
+                        100% {
+                            transform: translateY(${window.innerHeight + 20}px) rotate(360deg);
+                        }
+                    }
+                `;
+                document.head.appendChild(styleSheet);
             }
 
             setupScrollListener() {
@@ -117,7 +127,7 @@
             }
 
             startSnowing() {
-                if (!this.isSnowing) {
+                if (!this.isSnowing && this.container) {
                     this.isSnowing = true;
                     this.animate();
                 }
@@ -128,7 +138,7 @@
             }
 
             animate() {
-                if (!this.isSnowing) return;
+                if (!this.isSnowing || !this.container) return;
 
                 if (this.snowflakes.length < this.maxSnowflakes) {
                     const snowflake = new Snowflake(this.container);
@@ -140,6 +150,8 @@
 
             cleanup() {
                 setInterval(() => {
+                    if (!this.container) return;
+                    
                     this.snowflakes = this.snowflakes.filter(snowflake => {
                         const rect = snowflake.element.getBoundingClientRect();
                         if (rect.top > window.innerHeight) {
@@ -152,12 +164,12 @@
             }
         }
 
-        new SnowfallManager();
-    }
-
-    if (document.readyState === 'complete' || document.readyState === 'interactive') {
-        setTimeout(init, 1);
-    } else {
-        document.addEventListener('DOMContentLoaded', init);
-    }
-})();
+        // Initialize with a slight delay to ensure DOM is fully ready
+        setTimeout(() => {
+            if (document.body) {
+                new SnowfallManager();
+            }
+        }, 100);
+        
+    }, 100);
+});
