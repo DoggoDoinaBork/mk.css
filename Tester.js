@@ -59,7 +59,7 @@
                 // Movement parameters
                 this.wobbleSpeed = 0.02 + Math.random() * 0.08;
                 this.wobbleRange = Math.random() * 2 - 1;
-                this.fallSpeed = 2 + Math.random() * 3;
+                this.fallSpeed = 1 + Math.random() * 2; // Slightly slower fall speed
                 this.wobblePos = Math.random() * Math.PI * 2;
                 
                 // Apply initial position
@@ -71,20 +71,18 @@
                 this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
             }
 
-            move(isScrolling) {
+            move() {
                 if (!this.element) return false;
 
-                if (isScrolling) {
-                    // Update vertical position
-                    this.y += this.fallSpeed;
-                    
-                    // Update horizontal wobble
-                    this.wobblePos += this.wobbleSpeed;
-                    this.x += Math.sin(this.wobblePos) * this.wobbleRange;
-                    
-                    // Apply new position
-                    this.updatePosition();
-                }
+                // Always update position (continuous falling)
+                this.y += this.fallSpeed;
+                
+                // Update horizontal wobble
+                this.wobblePos += this.wobbleSpeed;
+                this.x += Math.sin(this.wobblePos) * this.wobbleRange;
+                
+                // Apply new position
+                this.updatePosition();
 
                 // Check if snowflake is still in view
                 return this.y <= window.innerHeight;
@@ -97,6 +95,7 @@
                 this.maxSnowflakes = 50;
                 this.isScrolling = false;
                 this.scrollTimeout = null;
+                this.baseSnowflakes = 20; // Number of snowflakes always present
                 
                 this.setupContainer();
                 
@@ -143,33 +142,40 @@
                         clearTimeout(this.scrollTimeout);
                     }
                     
-                    // Set scrolling state to true
+                    // Set scrolling state to true and spawn new snowflakes
                     this.isScrolling = true;
+                    this.addScrollTriggeredSnowflakes();
                     
-                    // Set timeout to stop scrolling state
+                    // Set timeout to stop spawning
                     this.scrollTimeout = setTimeout(() => {
                         this.isScrolling = false;
-                    }, 50);
+                    }, 150);
                 }, { passive: true });
 
                 // Handle window resize
                 window.addEventListener('resize', () => {
                     this.maxSnowflakes = Math.floor((window.innerWidth * window.innerHeight) / 20000);
+                    this.baseSnowflakes = Math.min(20, Math.floor(this.maxSnowflakes / 2));
                 });
             }
 
             startSnowfall() {
-                // Initial population of snowflakes
-                this.addNewSnowflakes();
+                // Initial population of base snowflakes
+                for (let i = 0; i < this.baseSnowflakes; i++) {
+                    this.snowflakes.push(new Snowflake(this.container));
+                }
                 
                 // Start the animation loop
                 this.animate();
             }
 
-            addNewSnowflakes() {
-                const numToAdd = this.maxSnowflakes - this.snowflakes.length;
-                for (let i = 0; i < numToAdd; i++) {
-                    this.snowflakes.push(new Snowflake(this.container));
+            addScrollTriggeredSnowflakes() {
+                // Only add new snowflakes while scrolling and below max
+                if (this.isScrolling && this.snowflakes.length < this.maxSnowflakes) {
+                    const numToAdd = Math.min(2, this.maxSnowflakes - this.snowflakes.length);
+                    for (let i = 0; i < numToAdd; i++) {
+                        this.snowflakes.push(new Snowflake(this.container));
+                    }
                 }
             }
 
@@ -178,20 +184,19 @@
 
                 // Update existing snowflakes
                 this.snowflakes = this.snowflakes.filter(snowflake => {
-                    const isVisible = snowflake.move(this.isScrolling);
+                    const isVisible = snowflake.move();
                     if (!isVisible) {
                         if (this.container.contains(snowflake.element)) {
                             this.container.removeChild(snowflake.element);
+                        }
+                        // Only automatically replace snowflakes up to baseSnowflakes count
+                        if (this.snowflakes.length <= this.baseSnowflakes) {
+                            this.snowflakes.push(new Snowflake(this.container));
                         }
                         return false;
                     }
                     return true;
                 });
-
-                // Add new snowflakes if needed
-                if (this.snowflakes.length < this.maxSnowflakes) {
-                    this.addNewSnowflakes();
-                }
 
                 // Continue animation loop
                 requestAnimationFrame(() => this.animate());
