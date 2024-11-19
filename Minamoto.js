@@ -1,11 +1,13 @@
-window.addEventListener('load', function() {
-    // Wait for a brief moment after load to ensure everything is ready
-    setTimeout(() => {
-        // Double check that document and body exist
-        if (!document || !document.body) return;
+(function() {
+    function initSnowfall() {
+        if (!document || !document.body) {
+            console.warn('DOM not ready, retrying in 100ms...');
+            setTimeout(initSnowfall, 100);
+            return;
+        }
 
         class Snowflake {
-            constructor(container) {
+            constructor(container, startX) {
                 this.container = container;
                 this.element = document.createElement('div');
                 this.element.className = 'snowflake';
@@ -16,7 +18,7 @@ window.addEventListener('load', function() {
                     '#89CFF0', // Baby Blue
                     '#defcf9', // Ice Blue
                     '#9fb4ff', // Light Purple
-                    '#ff9fb4', // Light Pink
+                    '#ff9fb4'  // Light Pink
                 ];
 
                 this.element.style.cssText = `
@@ -24,59 +26,89 @@ window.addEventListener('load', function() {
                     user-select: none;
                     z-index: 99999;
                     pointer-events: none;
-                    animation: fall linear;
                     transition: color 3s;
                 `;
                 this.element.innerHTML = '❄';
-                this.reset();
-                this.container.appendChild(this.element);
+                this.reset(startX);
                 
-                this.changeColor();
+                if (this.container && this.container.appendChild) {
+                    this.container.appendChild(this.element);
+                    this.changeColor();
+                }
             }
 
             changeColor() {
+                if (!this.element) return;
                 const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
                 this.element.style.color = randomColor;
                 setTimeout(() => this.changeColor(), 2000 + Math.random() * 2000);
             }
 
-            reset() {
-                const startX = Math.random() * window.innerWidth;
-                const startY = -20;
-                const duration = 3 + Math.random() * 4;
+            reset(startX = null) {
+                if (!this.element) return;
+                
+                const x = startX !== null ? startX : Math.random() * (window.innerWidth || document.documentElement.clientWidth);
+                const y = -20;
                 const size = 10 + Math.random() * 20;
                 const initialColor = this.colors[Math.floor(Math.random() * this.colors.length)];
 
-                this.element.style.left = startX + 'px';
-                this.element.style.top = startY + 'px';
-                this.element.style.fontSize = size + 'px';
-                this.element.style.opacity = 0.5 + Math.random() * 0.5;
-                this.element.style.animationDuration = duration + 's';
+                this.element.style.left = `${x}px`;
+                this.element.style.top = `${y}px`;
+                this.element.style.fontSize = `${size}px`;
+                this.element.style.opacity = (0.5 + Math.random() * 0.5).toString();
                 this.element.style.color = initialColor;
+                
+                this.currentY = y;
+                this.speed = 2 + Math.random() * 3;
+                this.wobble = Math.random() * 2 - 1;
+                this.wobbleSpeed = 0.02 + Math.random() * 0.08;
+                this.wobblePos = Math.random() * Math.PI * 2;
+            }
+
+            update(isScrolling) {
+                if (!this.element) return false;
+
+                // Only update position if scrolling
+                if (isScrolling) {
+                    this.currentY += this.speed;
+                    this.wobblePos += this.wobbleSpeed;
+                    
+                    this.element.style.transform = `translate(${Math.sin(this.wobblePos) * this.wobble}px, ${this.currentY}px)`;
+                }
+
+                const rect = this.element.getBoundingClientRect();
+                return rect.top <= window.innerHeight;
             }
         }
 
         class SnowfallManager {
             constructor() {
-                // Create and append the container first
+                this.snowflakes = [];
+                this.maxSnowflakes = 50;
+                this.isScrolling = false;
+                this.scrollTimeout = null;
+                this.lastScrollY = window.scrollY;
+                
                 this.setupContainer();
                 
                 if (this.container) {
-                    this.snowflakes = [];
-                    this.maxSnowflakes = 50;
-                    this.isSnowing = false;
-                    this.lastScrollPosition = window.scrollY;
-                    this.scrollThreshold = 50;
-
-                    this.setupStyles();
                     this.setupScrollListener();
-                    this.cleanup();
+                    this.animate();
                 }
             }
 
             setupContainer() {
                 try {
+                    if (!document.body) throw new Error('Document body not found');
+                    
                     this.container = document.createElement('div');
+                    this.container.id = 'snowfall-container';
+                    
+                    const existingContainer = document.getElementById('snowfall-container');
+                    if (existingContainer) {
+                        existingContainer.remove();
+                    }
+
                     this.container.style.cssText = `
                         position: fixed;
                         top: 0;
@@ -87,89 +119,74 @@ window.addEventListener('load', function() {
                         z-index: 99999;
                     `;
                     
-                    if (document.body) {
-                        document.body.appendChild(this.container);
-                    }
+                    document.body.appendChild(this.container);
                 } catch (error) {
-                    console.log('Error setting up snow container:', error);
+                    console.error('Error setting up snow container:', error);
                     this.container = null;
                 }
             }
 
-            setupStyles() {
-                const styleSheet = document.createElement('style');
-                styleSheet.textContent = `
-                    @keyframes fall {
-                        0% {
-                            transform: translateY(0) rotate(0deg);
-                        }
-                        100% {
-                            transform: translateY(${window.innerHeight + 20}px) rotate(360deg);
-                        }
-                    }
-                `;
-                document.head.appendChild(styleSheet);
-            }
-
             setupScrollListener() {
-                let scrollTimeout;
-                window.addEventListener('scroll', () => {
-                    const currentScroll = window.scrollY;
-                    const scrollDifference = Math.abs(currentScroll - this.lastScrollPosition);
-
-                    if (scrollDifference > this.scrollThreshold) {
-                        this.startSnowing();
-                        clearTimeout(scrollTimeout);
-                        scrollTimeout = setTimeout(() => this.stopSnowing(), 1000);
-                        this.lastScrollPosition = currentScroll;
+                const handleScroll = () => {
+                    // Clear the timeout if it exists
+                    if (this.scrollTimeout) {
+                        clearTimeout(this.scrollTimeout);
                     }
+
+                    // Start or continue scrolling state
+                    this.isScrolling = true;
+
+                    // Add new snowflakes while scrolling
+                    if (this.snowflakes.length < this.maxSnowflakes) {
+                        const newFlakesCount = Math.min(3, this.maxSnowflakes - this.snowflakes.length);
+                        for (let i = 0; i < newFlakesCount; i++) {
+                            const startX = Math.random() * window.innerWidth;
+                            this.snowflakes.push(new Snowflake(this.container, startX));
+                        }
+                    }
+
+                    // Set timeout to stop scrolling state
+                    this.scrollTimeout = setTimeout(() => {
+                        this.isScrolling = false;
+                    }, 50); // Short timeout to smooth out the stop/start
+
+                    this.lastScrollY = window.scrollY;
+                };
+
+                // Remove existing listener before adding new one
+                window.removeEventListener('scroll', handleScroll);
+                window.addEventListener('scroll', handleScroll);
+                
+                // Add resize handler
+                window.addEventListener('resize', () => {
+                    this.maxSnowflakes = Math.floor((window.innerWidth * window.innerHeight) / 20000);
                 });
             }
 
-            startSnowing() {
-                if (!this.isSnowing && this.container) {
-                    this.isSnowing = true;
-                    this.animate();
-                }
-            }
-
-            stopSnowing() {
-                this.isSnowing = false;
-            }
-
             animate() {
-                if (!this.isSnowing || !this.container) return;
+                if (!this.container) return;
 
-                if (this.snowflakes.length < this.maxSnowflakes) {
-                    const snowflake = new Snowflake(this.container);
-                    this.snowflakes.push(snowflake);
-                }
+                // Update existing snowflakes
+                this.snowflakes = this.snowflakes.filter(snowflake => {
+                    const isVisible = snowflake.update(this.isScrolling);
+                    if (!isVisible) {
+                        this.container.removeChild(snowflake.element);
+                    }
+                    return isVisible;
+                });
 
+                // Request next frame
                 requestAnimationFrame(() => this.animate());
-            }
-
-            cleanup() {
-                setInterval(() => {
-                    if (!this.container) return;
-                    
-                    this.snowflakes = this.snowflakes.filter(snowflake => {
-                        const rect = snowflake.element.getBoundingClientRect();
-                        if (rect.top > window.innerHeight) {
-                            this.container.removeChild(snowflake.element);
-                            return false;
-                        }
-                        return true;
-                    });
-                }, 1000);
             }
         }
 
-        // Initialize with a slight delay to ensure DOM is fully ready
-        setTimeout(() => {
-            if (document.body) {
-                new SnowfallManager();
-            }
-        }, 100);
-        
-    }, 100);
-});
+        return new SnowfallManager();
+    }
+
+    // Start the initialization process
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initSnowfall);
+    } else {
+        initSnowfall();
+    }
+})();
