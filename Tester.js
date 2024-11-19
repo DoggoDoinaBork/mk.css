@@ -21,7 +21,6 @@
                     '#ff9fb4'  // Light Pink
                 ];
 
-                // Set initial styles
                 this.element.style.cssText = `
                     position: fixed;
                     user-select: none;
@@ -48,7 +47,6 @@
             reset(startX = null) {
                 if (!this.element) return;
                 
-                // Use provided startX or generate random
                 const x = startX !== null ? startX : Math.random() * (window.innerWidth || document.documentElement.clientWidth);
                 const y = -20;
                 const size = 10 + Math.random() * 20;
@@ -60,26 +58,24 @@
                 this.element.style.opacity = (0.5 + Math.random() * 0.5).toString();
                 this.element.style.color = initialColor;
                 
-                // Set initial position properties
                 this.currentY = y;
-                this.speed = 2 + Math.random() * 3; // pixels per frame
-                this.wobble = Math.random() * 2 - 1; // Left/right movement
-                this.wobbleSpeed = 0.02 + Math.random() * 0.08; // How fast it moves left/right
-                this.wobblePos = Math.random() * Math.PI * 2; // Starting position in the wobble
+                this.speed = 2 + Math.random() * 3;
+                this.wobble = Math.random() * 2 - 1;
+                this.wobbleSpeed = 0.02 + Math.random() * 0.08;
+                this.wobblePos = Math.random() * Math.PI * 2;
             }
 
-            update() {
+            update(isScrolling) {
                 if (!this.element) return false;
 
-                // Update position
-                this.currentY += this.speed;
-                this.wobblePos += this.wobbleSpeed;
-                const newX = parseFloat(this.element.style.left) + Math.sin(this.wobblePos) * this.wobble;
-                
-                // Update element position
-                this.element.style.transform = `translate(${Math.sin(this.wobblePos) * this.wobble}px, ${this.currentY}px)`;
+                // Only update position if scrolling
+                if (isScrolling) {
+                    this.currentY += this.speed;
+                    this.wobblePos += this.wobbleSpeed;
+                    
+                    this.element.style.transform = `translate(${Math.sin(this.wobblePos) * this.wobble}px, ${this.currentY}px)`;
+                }
 
-                // Check if snowflake is still within viewport
                 const rect = this.element.getBoundingClientRect();
                 return rect.top <= window.innerHeight;
             }
@@ -89,12 +85,10 @@
             constructor() {
                 this.snowflakes = [];
                 this.maxSnowflakes = 50;
-                this.isSnowing = false;
+                this.isScrolling = false;
+                this.scrollTimeout = null;
                 this.lastScrollY = window.scrollY;
-                this.scrollVelocity = 0;
-                this.lastScrollTime = Date.now();
                 
-                // Setup container first
                 this.setupContainer();
                 
                 if (this.container) {
@@ -110,7 +104,6 @@
                     this.container = document.createElement('div');
                     this.container.id = 'snowfall-container';
                     
-                    // Check if container already exists
                     const existingContainer = document.getElementById('snowfall-container');
                     if (existingContainer) {
                         existingContainer.remove();
@@ -134,38 +127,30 @@
             }
 
             setupScrollListener() {
-                let scrollTimeout;
-                
                 const handleScroll = () => {
-                    const currentTime = Date.now();
-                    const currentScrollY = window.scrollY;
-                    const timeDiff = currentTime - this.lastScrollTime;
-                    
-                    if (timeDiff > 0) {
-                        // Calculate scroll velocity (pixels per millisecond)
-                        this.scrollVelocity = Math.abs(currentScrollY - this.lastScrollY) / timeDiff;
-                        
-                        // Add snowflakes based on scroll velocity
-                        const flakesToAdd = Math.min(5, Math.floor(this.scrollVelocity * 50));
-                        
-                        // Add snowflakes across the viewport width
-                        for (let i = 0; i < flakesToAdd; i++) {
+                    // Clear the timeout if it exists
+                    if (this.scrollTimeout) {
+                        clearTimeout(this.scrollTimeout);
+                    }
+
+                    // Start or continue scrolling state
+                    this.isScrolling = true;
+
+                    // Add new snowflakes while scrolling
+                    if (this.snowflakes.length < this.maxSnowflakes) {
+                        const newFlakesCount = Math.min(3, this.maxSnowflakes - this.snowflakes.length);
+                        for (let i = 0; i < newFlakesCount; i++) {
                             const startX = Math.random() * window.innerWidth;
-                            if (this.snowflakes.length < this.maxSnowflakes) {
-                                this.snowflakes.push(new Snowflake(this.container, startX));
-                            }
+                            this.snowflakes.push(new Snowflake(this.container, startX));
                         }
                     }
-                    
-                    this.lastScrollY = currentScrollY;
-                    this.lastScrollTime = currentTime;
-                    
-                    // Clear previous timeout
-                    clearTimeout(scrollTimeout);
-                    // Gradually reduce scroll velocity
-                    scrollTimeout = setTimeout(() => {
-                        this.scrollVelocity = 0;
-                    }, 150);
+
+                    // Set timeout to stop scrolling state
+                    this.scrollTimeout = setTimeout(() => {
+                        this.isScrolling = false;
+                    }, 50); // Short timeout to smooth out the stop/start
+
+                    this.lastScrollY = window.scrollY;
                 };
 
                 // Remove existing listener before adding new one
@@ -183,7 +168,7 @@
 
                 // Update existing snowflakes
                 this.snowflakes = this.snowflakes.filter(snowflake => {
-                    const isVisible = snowflake.update();
+                    const isVisible = snowflake.update(this.isScrolling);
                     if (!isVisible) {
                         this.container.removeChild(snowflake.element);
                     }
@@ -195,7 +180,6 @@
             }
         }
 
-        // Initialize the SnowfallManager
         return new SnowfallManager();
     }
 
