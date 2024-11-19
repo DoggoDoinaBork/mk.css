@@ -1,5 +1,4 @@
 (function() {
-    // Create a function that ensures the DOM is fully loaded
     function initSnowfall() {
         if (!document || !document.body) {
             console.warn('DOM not ready, retrying in 100ms...');
@@ -8,7 +7,7 @@
         }
 
         class Snowflake {
-            constructor(container) {
+            constructor(container, startX) {
                 this.container = container;
                 this.element = document.createElement('div');
                 this.element.className = 'snowflake';
@@ -28,13 +27,11 @@
                     user-select: none;
                     z-index: 99999;
                     pointer-events: none;
-                    animation: snowfall linear;
                     transition: color 3s;
                 `;
                 this.element.innerHTML = '❄';
-                this.reset();
+                this.reset(startX);
                 
-                // Only append if container exists
                 if (this.container && this.container.appendChild) {
                     this.container.appendChild(this.element);
                     this.changeColor();
@@ -48,20 +45,43 @@
                 setTimeout(() => this.changeColor(), 2000 + Math.random() * 2000);
             }
 
-            reset() {
+            reset(startX = null) {
                 if (!this.element) return;
-                const startX = Math.random() * (window.innerWidth || document.documentElement.clientWidth);
-                const startY = -20;
-                const duration = 3 + Math.random() * 4;
+                
+                // Use provided startX or generate random
+                const x = startX !== null ? startX : Math.random() * (window.innerWidth || document.documentElement.clientWidth);
+                const y = -20;
                 const size = 10 + Math.random() * 20;
                 const initialColor = this.colors[Math.floor(Math.random() * this.colors.length)];
 
-                this.element.style.left = `${startX}px`;
-                this.element.style.top = `${startY}px`;
+                this.element.style.left = `${x}px`;
+                this.element.style.top = `${y}px`;
                 this.element.style.fontSize = `${size}px`;
                 this.element.style.opacity = (0.5 + Math.random() * 0.5).toString();
-                this.element.style.animationDuration = `${duration}s`;
                 this.element.style.color = initialColor;
+                
+                // Set initial position properties
+                this.currentY = y;
+                this.speed = 2 + Math.random() * 3; // pixels per frame
+                this.wobble = Math.random() * 2 - 1; // Left/right movement
+                this.wobbleSpeed = 0.02 + Math.random() * 0.08; // How fast it moves left/right
+                this.wobblePos = Math.random() * Math.PI * 2; // Starting position in the wobble
+            }
+
+            update() {
+                if (!this.element) return false;
+
+                // Update position
+                this.currentY += this.speed;
+                this.wobblePos += this.wobbleSpeed;
+                const newX = parseFloat(this.element.style.left) + Math.sin(this.wobblePos) * this.wobble;
+                
+                // Update element position
+                this.element.style.transform = `translate(${Math.sin(this.wobblePos) * this.wobble}px, ${this.currentY}px)`;
+
+                // Check if snowflake is still within viewport
+                const rect = this.element.getBoundingClientRect();
+                return rect.top <= window.innerHeight;
             }
         }
 
@@ -70,16 +90,16 @@
                 this.snowflakes = [];
                 this.maxSnowflakes = 50;
                 this.isSnowing = false;
-                this.lastScrollPosition = window.scrollY;
-                this.scrollThreshold = 50;
-
+                this.lastScrollY = window.scrollY;
+                this.scrollVelocity = 0;
+                this.lastScrollTime = Date.now();
+                
                 // Setup container first
                 this.setupContainer();
                 
                 if (this.container) {
-                    this.setupStyles();
                     this.setupScrollListener();
-                    this.cleanup();
+                    this.animate();
                 }
             }
 
@@ -113,92 +133,65 @@
                 }
             }
 
-            setupStyles() {
-                try {
-                    const styleId = 'snowfall-styles';
-                    let styleSheet = document.getElementById(styleId);
-                    
-                    if (styleSheet) {
-                        styleSheet.remove();
-                    }
-
-                    styleSheet = document.createElement('style');
-                    styleSheet.id = styleId;
-                    styleSheet.textContent = `
-                        @keyframes snowfall {
-                            0% {
-                                transform: translateY(0) rotate(0deg);
-                            }
-                            100% {
-                                transform: translateY(${window.innerHeight + 20}px) rotate(360deg);
-                            }
-                        }
-                    `;
-                    document.head.appendChild(styleSheet);
-                } catch (error) {
-                    console.error('Error setting up styles:', error);
-                }
-            }
-
             setupScrollListener() {
                 let scrollTimeout;
+                
                 const handleScroll = () => {
-                    const currentScroll = window.scrollY;
-                    const scrollDifference = Math.abs(currentScroll - this.lastScrollPosition);
-
-                    if (scrollDifference > this.scrollThreshold) {
-                        this.startSnowing();
-                        clearTimeout(scrollTimeout);
-                        scrollTimeout = setTimeout(() => this.stopSnowing(), 1000);
-                        this.lastScrollPosition = currentScroll;
+                    const currentTime = Date.now();
+                    const currentScrollY = window.scrollY;
+                    const timeDiff = currentTime - this.lastScrollTime;
+                    
+                    if (timeDiff > 0) {
+                        // Calculate scroll velocity (pixels per millisecond)
+                        this.scrollVelocity = Math.abs(currentScrollY - this.lastScrollY) / timeDiff;
+                        
+                        // Add snowflakes based on scroll velocity
+                        const flakesToAdd = Math.min(5, Math.floor(this.scrollVelocity * 50));
+                        
+                        // Add snowflakes across the viewport width
+                        for (let i = 0; i < flakesToAdd; i++) {
+                            const startX = Math.random() * window.innerWidth;
+                            if (this.snowflakes.length < this.maxSnowflakes) {
+                                this.snowflakes.push(new Snowflake(this.container, startX));
+                            }
+                        }
                     }
+                    
+                    this.lastScrollY = currentScrollY;
+                    this.lastScrollTime = currentTime;
+                    
+                    // Clear previous timeout
+                    clearTimeout(scrollTimeout);
+                    // Gradually reduce scroll velocity
+                    scrollTimeout = setTimeout(() => {
+                        this.scrollVelocity = 0;
+                    }, 150);
                 };
 
+                // Remove existing listener before adding new one
                 window.removeEventListener('scroll', handleScroll);
                 window.addEventListener('scroll', handleScroll);
-            }
-
-            startSnowing() {
-                if (!this.isSnowing && this.container) {
-                    this.isSnowing = true;
-                    this.animate();
-                }
-            }
-
-            stopSnowing() {
-                this.isSnowing = false;
+                
+                // Add resize handler
+                window.addEventListener('resize', () => {
+                    this.maxSnowflakes = Math.floor((window.innerWidth * window.innerHeight) / 20000);
+                });
             }
 
             animate() {
-                if (!this.isSnowing || !this.container) return;
+                if (!this.container) return;
 
-                if (this.snowflakes.length < this.maxSnowflakes) {
-                    const snowflake = new Snowflake(this.container);
-                    this.snowflakes.push(snowflake);
-                }
+                // Update existing snowflakes
+                this.snowflakes = this.snowflakes.filter(snowflake => {
+                    const isVisible = snowflake.update();
+                    if (!isVisible) {
+                        this.container.removeChild(snowflake.element);
+                    }
+                    return isVisible;
+                });
 
+                // Request next frame
                 requestAnimationFrame(() => this.animate());
-            }
-
-            cleanup() {
-                setInterval(() => {
-                    if (!this.container) return;
-                    
-                    this.snowflakes = this.snowflakes.filter(snowflake => {
-                        if (!snowflake.element) return false;
-                        
-                        const rect = snowflake.element.getBoundingClientRect();
-                        if (rect.top > window.innerHeight) {
-                            try {
-                                this.container.removeChild(snowflake.element);
-                            } catch (error) {
-                                console.error('Error removing snowflake:', error);
-                            }
-                            return false;
-                        }
-                        return true;
-                    });
-                }, 1000);
             }
         }
 
