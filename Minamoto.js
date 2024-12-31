@@ -1,215 +1,190 @@
-(function() {
-    function initSnowfall() {
-        if (!document || !document.body) {
-            console.warn('DOM not ready, retrying in 100ms...');
-            setTimeout(initSnowfall, 100);
-            return;
+<!DOCTYPE html>
+<html>
+<head>
+    <title>Fireworks Animation</title>
+    <style>
+        body {
+            margin: 0;
+            min-height: 100vh;
+            background: #000;
+            overflow: hidden;
+            cursor: pointer;
         }
+        .content {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            color: white;
+            font-family: Arial, sans-serif;
+            text-align: center;
+            pointer-events: none;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="content">
+        <h1>✨ Click Anywhere for Fireworks! ✨</h1>
+    </div>
 
-        class Snowflake {
-            constructor(container) {
-                this.container = container;
+    <script>
+    (function() {
+        class Particle {
+            constructor(x, y, color) {
+                this.x = x;
+                this.y = y;
+                this.color = color;
                 this.element = document.createElement('div');
-                this.element.className = 'snowflake';
-                
-                this.colors = [
-                    '#ffffff', // White
-                    '#00fff2', // Light Blue
-                    '#89CFF0', // Baby Blue
-                    '#defcf9', // Ice Blue
-                    '#9fb4ff', // Light Purple
-                    '#ff9fb4'  // Light Pink
-                ];
-
                 this.element.style.cssText = `
                     position: fixed;
-                    user-select: none;
-                    z-index: 99999;
+                    width: 4px;
+                    height: 4px;
+                    background: ${color};
+                    border-radius: 50%;
                     pointer-events: none;
-                    transition: transform 0.1s linear;
+                    transform: translate(${x}px, ${y}px);
+                    transition: transform 0.02s linear;
                 `;
-                this.element.innerHTML = '❄';
                 
-                if (this.container && this.container.appendChild) {
-                    this.container.appendChild(this.element);
-                    this.reset();
-                    this.changeColor();
-                }
+                // Random velocity in all directions
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 6;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                // Gravity and fade effects
+                this.gravity = 0.12;
+                this.life = 1;
+                this.decay = 0.015 + Math.random() * 0.015;
             }
 
-            changeColor() {
-                if (!this.element) return;
-                const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
-                this.element.style.color = randomColor;
-                setTimeout(() => this.changeColor(), 2000 + Math.random() * 2000);
-            }
+            update() {
+                this.life -= this.decay;
+                if (this.life <= 0) return false;
 
-            reset() {
-                if (!this.element) return;
-                
-                // Initialize position and movement properties
-                this.x = Math.random() * window.innerWidth;
-                this.y = -20;
-                const size = 10 + Math.random() * 20;
-                
-                // Set initial styles
-                this.element.style.fontSize = `${size}px`;
-                this.element.style.opacity = (0.5 + Math.random() * 0.5).toString();
-                
-                // Movement parameters
-                this.wobbleSpeed = 0.02 + Math.random() * 0.08;
-                this.wobbleRange = Math.random() * 2 - 1;
-                this.fallSpeed = 1 + Math.random() * 2; // Slightly slower fall speed
-                this.wobblePos = Math.random() * Math.PI * 2;
-                
-                // Apply initial position
-                this.updatePosition();
-            }
+                // Apply gravity and velocity
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
 
-            updatePosition() {
-                if (!this.element) return;
+                // Update position and opacity
                 this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
-            }
+                this.element.style.opacity = this.life;
 
-            move() {
-                if (!this.element) return false;
-
-                // Always update position (continuous falling)
-                this.y += this.fallSpeed;
-                
-                // Update horizontal wobble
-                this.wobblePos += this.wobbleSpeed;
-                this.x += Math.sin(this.wobblePos) * this.wobbleRange;
-                
-                // Apply new position
-                this.updatePosition();
-
-                // Check if snowflake is still in view
-                return this.y <= window.innerHeight;
+                return true;
             }
         }
 
-        class SnowfallManager {
+        class Firework {
+            constructor(x, y) {
+                this.x = x;
+                this.y = y;
+                this.particles = [];
+                this.container = document.createElement('div');
+                this.container.style.position = 'fixed';
+                this.container.style.zIndex = '1000';
+                document.body.appendChild(this.container);
+                
+                this.colors = [
+                    '#ff0000', // Red
+                    '#ffa500', // Orange
+                    '#ffff00', // Yellow
+                    '#00ff00', // Green
+                    '#00ffff', // Cyan
+                    '#ff00ff', // Magenta
+                    '#ff69b4', // Pink
+                    '#daa520'  // Golden
+                ];
+
+                this.explode();
+            }
+
+            explode() {
+                const color = this.colors[Math.floor(Math.random() * this.colors.length)];
+                const particleCount = 50 + Math.floor(Math.random() * 30);
+
+                for (let i = 0; i < particleCount; i++) {
+                    const particle = new Particle(this.x, this.y, color);
+                    this.container.appendChild(particle.element);
+                    this.particles.push(particle);
+                }
+            }
+
+            update() {
+                this.particles = this.particles.filter(particle => {
+                    const alive = particle.update();
+                    if (!alive) {
+                        this.container.removeChild(particle.element);
+                    }
+                    return alive;
+                });
+
+                if (this.particles.length === 0) {
+                    document.body.removeChild(this.container);
+                    return false;
+                }
+                return true;
+            }
+        }
+
+        class FireworksManager {
             constructor() {
-                this.snowflakes = [];
-                this.maxSnowflakes = 50;
-                this.isScrolling = false;
-                this.scrollTimeout = null;
-                this.baseSnowflakes = 20; // Number of snowflakes always present
-                
-                this.setupContainer();
-                
-                if (this.container) {
-                    this.setupScrollListener();
-                    this.startSnowfall();
-                }
+                this.fireworks = [];
+                this.isAnimating = false;
+                this.setupEventListeners();
+                this.autoLaunchInterval = null;
+                this.startAutoLaunch();
             }
 
-            setupContainer() {
-                try {
-                    if (!document.body) throw new Error('Document body not found');
-                    
-                    // Remove existing container if present
-                    const existingContainer = document.getElementById('snowfall-container');
-                    if (existingContainer) {
-                        existingContainer.remove();
-                    }
+            setupEventListeners() {
+                document.addEventListener('click', (e) => {
+                    this.createFirework(e.clientX, e.clientY);
+                });
 
-                    // Create new container
-                    this.container = document.createElement('div');
-                    this.container.id = 'snowfall-container';
-                    this.container.style.cssText = `
-                        position: fixed;
-                        top: 0;
-                        left: 0;
-                        width: 100vw;
-                        height: 100vh;
-                        pointer-events: none;
-                        z-index: 99999;
-                    `;
-                    
-                    document.body.appendChild(this.container);
-                } catch (error) {
-                    console.error('Error setting up snow container:', error);
-                    this.container = null;
-                }
-            }
-
-            setupScrollListener() {
-                window.addEventListener('scroll', () => {
-                    // Clear existing timeout
-                    if (this.scrollTimeout) {
-                        clearTimeout(this.scrollTimeout);
-                    }
-                    
-                    // Set scrolling state to true and spawn new snowflakes
-                    this.isScrolling = true;
-                    this.addScrollTriggeredSnowflakes();
-                    
-                    // Set timeout to stop spawning
-                    this.scrollTimeout = setTimeout(() => {
-                        this.isScrolling = false;
-                    }, 150);
-                }, { passive: true });
-
-                // Handle window resize
-                window.addEventListener('resize', () => {
-                    this.maxSnowflakes = Math.floor((window.innerWidth * window.innerHeight) / 20000);
-                    this.baseSnowflakes = Math.min(20, Math.floor(this.maxSnowflakes / 2));
+                document.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    this.createFirework(touch.clientX, touch.clientY);
                 });
             }
 
-            startSnowfall() {
-                // Initial population of base snowflakes
-                for (let i = 0; i < this.baseSnowflakes; i++) {
-                    this.snowflakes.push(new Snowflake(this.container));
-                }
+            createFirework(x, y) {
+                const firework = new Firework(x, y);
+                this.fireworks.push(firework);
                 
-                // Start the animation loop
-                this.animate();
+                if (!this.isAnimating) {
+                    this.isAnimating = true;
+                    this.animate();
+                }
             }
 
-            addScrollTriggeredSnowflakes() {
-                // Only add new snowflakes while scrolling and below max
-                if (this.isScrolling && this.snowflakes.length < this.maxSnowflakes) {
-                    const numToAdd = Math.min(2, this.maxSnowflakes - this.snowflakes.length);
-                    for (let i = 0; i < numToAdd; i++) {
-                        this.snowflakes.push(new Snowflake(this.container));
-                    }
-                }
+            startAutoLaunch() {
+                this.autoLaunchInterval = setInterval(() => {
+                    const x = Math.random() * window.innerWidth;
+                    const y = Math.random() * (window.innerHeight * 0.7);
+                    this.createFirework(x, y);
+                }, 2000);
             }
 
             animate() {
-                if (!this.container) return;
+                this.fireworks = this.fireworks.filter(firework => firework.update());
 
-                // Update existing snowflakes
-                this.snowflakes = this.snowflakes.filter(snowflake => {
-                    const isVisible = snowflake.move();
-                    if (!isVisible) {
-                        if (this.container.contains(snowflake.element)) {
-                            this.container.removeChild(snowflake.element);
-                        }
-                        // Only automatically replace snowflakes up to baseSnowflakes count
-                        if (this.snowflakes.length <= this.baseSnowflakes) {
-                            this.snowflakes.push(new Snowflake(this.container));
-                        }
-                        return false;
-                    }
-                    return true;
-                });
-
-                // Continue animation loop
-                requestAnimationFrame(() => this.animate());
+                if (this.fireworks.length > 0) {
+                    requestAnimationFrame(() => this.animate());
+                } else {
+                    this.isAnimating = false;
+                }
             }
         }
 
-        return new SnowfallManager();
-    }
-
-    // Start the initialization process
-    if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSnowfall);
-    } else {
-        initSnowfall();
-    }
-})();
+        // Initialize when the DOM is ready
+        if (document.readyState === 'loading') {
+            document.addEventListener('DOMContentLoaded', () => new FireworksManager());
+        } else {
+            new FireworksManager();
+        }
+    })();
+    </script>
+</body>
+</html>
