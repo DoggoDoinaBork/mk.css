@@ -1,190 +1,175 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Fireworks Animation</title>
-    <style>
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background: #000;
-            overflow: hidden;
-            cursor: pointer;
-        }
-        .content {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            pointer-events: none;
-            opacity: 0.7;
-        }
-    </style>
-</head>
-<body>
-    <div class="content">
-        <h1>✨ Click Anywhere for Fireworks! ✨</h1>
-    </div>
+window.addEventListener('load', function() {
+    // Wait for a brief moment after load to ensure everything is ready
+    setTimeout(() => {
+        // Double check that document and body exist
+        if (!document || !document.body) return;
 
-    <script>
-    (function() {
-        class Particle {
-            constructor(x, y, color) {
-                this.x = x;
-                this.y = y;
-                this.color = color;
+        class Snowflake {
+            constructor(container) {
+                this.container = container;
                 this.element = document.createElement('div');
-                this.element.style.cssText = `
-                    position: fixed;
-                    width: 4px;
-                    height: 4px;
-                    background: ${color};
-                    border-radius: 50%;
-                    pointer-events: none;
-                    transform: translate(${x}px, ${y}px);
-                    transition: transform 0.02s linear;
-                `;
-                
-                // Random velocity in all directions
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 2 + Math.random() * 6;
-                this.vx = Math.cos(angle) * speed;
-                this.vy = Math.sin(angle) * speed;
-                
-                // Gravity and fade effects
-                this.gravity = 0.12;
-                this.life = 1;
-                this.decay = 0.015 + Math.random() * 0.015;
-            }
-
-            update() {
-                this.life -= this.decay;
-                if (this.life <= 0) return false;
-
-                // Apply gravity and velocity
-                this.vy += this.gravity;
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Update position and opacity
-                this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
-                this.element.style.opacity = this.life;
-
-                return true;
-            }
-        }
-
-        class Firework {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.particles = [];
-                this.container = document.createElement('div');
-                this.container.style.position = 'fixed';
-                this.container.style.zIndex = '1000';
-                document.body.appendChild(this.container);
+                this.element.className = 'snowflake';
                 
                 this.colors = [
-                    '#ff0000', // Red
-                    '#ffa500', // Orange
-                    '#ffff00', // Yellow
-                    '#00ff00', // Green
-                    '#00ffff', // Cyan
-                    '#ff00ff', // Magenta
-                    '#ff69b4', // Pink
-                    '#daa520'  // Golden
+                    '#ffffff', // White
+                    '#00fff2', // Light Blue
+                    '#89CFF0', // Baby Blue
+                    '#defcf9', // Ice Blue
+                    '#9fb4ff', // Light Purple
+                    '#ff9fb4', // Light Pink
                 ];
 
-                this.explode();
+                this.element.style.cssText = `
+                    position: fixed;
+                    user-select: none;
+                    z-index: 99999;
+                    pointer-events: none;
+                    animation: fall linear;
+                    transition: color 3s;
+                `;
+                this.element.innerHTML = '❄';
+                this.reset();
+                this.container.appendChild(this.element);
+                
+                this.changeColor();
             }
 
-            explode() {
-                const color = this.colors[Math.floor(Math.random() * this.colors.length)];
-                const particleCount = 50 + Math.floor(Math.random() * 30);
-
-                for (let i = 0; i < particleCount; i++) {
-                    const particle = new Particle(this.x, this.y, color);
-                    this.container.appendChild(particle.element);
-                    this.particles.push(particle);
-                }
+            changeColor() {
+                const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
+                this.element.style.color = randomColor;
+                setTimeout(() => this.changeColor(), 2000 + Math.random() * 2000);
             }
 
-            update() {
-                this.particles = this.particles.filter(particle => {
-                    const alive = particle.update();
-                    if (!alive) {
-                        this.container.removeChild(particle.element);
-                    }
-                    return alive;
-                });
+            reset() {
+                const startX = Math.random() * window.innerWidth;
+                const startY = -20;
+                const duration = 3 + Math.random() * 4;
+                const size = 10 + Math.random() * 20;
+                const initialColor = this.colors[Math.floor(Math.random() * this.colors.length)];
 
-                if (this.particles.length === 0) {
-                    document.body.removeChild(this.container);
-                    return false;
-                }
-                return true;
+                this.element.style.left = startX + 'px';
+                this.element.style.top = startY + 'px';
+                this.element.style.fontSize = size + 'px';
+                this.element.style.opacity = 0.5 + Math.random() * 0.5;
+                this.element.style.animationDuration = duration + 's';
+                this.element.style.color = initialColor;
             }
         }
 
-        class FireworksManager {
+        class SnowfallManager {
             constructor() {
-                this.fireworks = [];
-                this.isAnimating = false;
-                this.setupEventListeners();
-                this.autoLaunchInterval = null;
-                this.startAutoLaunch();
-            }
-
-            setupEventListeners() {
-                document.addEventListener('click', (e) => {
-                    this.createFirework(e.clientX, e.clientY);
-                });
-
-                document.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    this.createFirework(touch.clientX, touch.clientY);
-                });
-            }
-
-            createFirework(x, y) {
-                const firework = new Firework(x, y);
-                this.fireworks.push(firework);
+                // Create and append the container first
+                this.setupContainer();
                 
-                if (!this.isAnimating) {
-                    this.isAnimating = true;
+                if (this.container) {
+                    this.snowflakes = [];
+                    this.maxSnowflakes = 50;
+                    this.isSnowing = false;
+                    this.lastScrollPosition = window.scrollY;
+                    this.scrollThreshold = 50;
+
+                    this.setupStyles();
+                    this.setupScrollListener();
+                    this.cleanup();
+                }
+            }
+
+            setupContainer() {
+                try {
+                    this.container = document.createElement('div');
+                    this.container.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        pointer-events: none;
+                        z-index: 99999;
+                    `;
+                    
+                    if (document.body) {
+                        document.body.appendChild(this.container);
+                    }
+                } catch (error) {
+                    console.log('Error setting up snow container:', error);
+                    this.container = null;
+                }
+            }
+
+            setupStyles() {
+                const styleSheet = document.createElement('style');
+                styleSheet.textContent = `
+                    @keyframes fall {
+                        0% {
+                            transform: translateY(0) rotate(0deg);
+                        }
+                        100% {
+                            transform: translateY(${window.innerHeight + 20}px) rotate(360deg);
+                        }
+                    }
+                `;
+                document.head.appendChild(styleSheet);
+            }
+
+            setupScrollListener() {
+                let scrollTimeout;
+                window.addEventListener('scroll', () => {
+                    const currentScroll = window.scrollY;
+                    const scrollDifference = Math.abs(currentScroll - this.lastScrollPosition);
+
+                    if (scrollDifference > this.scrollThreshold) {
+                        this.startSnowing();
+                        clearTimeout(scrollTimeout);
+                        scrollTimeout = setTimeout(() => this.stopSnowing(), 1000);
+                        this.lastScrollPosition = currentScroll;
+                    }
+                });
+            }
+
+            startSnowing() {
+                if (!this.isSnowing && this.container) {
+                    this.isSnowing = true;
                     this.animate();
                 }
             }
 
-            startAutoLaunch() {
-                this.autoLaunchInterval = setInterval(() => {
-                    const x = Math.random() * window.innerWidth;
-                    const y = Math.random() * (window.innerHeight * 0.7);
-                    this.createFirework(x, y);
-                }, 2000);
+            stopSnowing() {
+                this.isSnowing = false;
             }
 
             animate() {
-                this.fireworks = this.fireworks.filter(firework => firework.update());
+                if (!this.isSnowing || !this.container) return;
 
-                if (this.fireworks.length > 0) {
-                    requestAnimationFrame(() => this.animate());
-                } else {
-                    this.isAnimating = false;
+                if (this.snowflakes.length < this.maxSnowflakes) {
+                    const snowflake = new Snowflake(this.container);
+                    this.snowflakes.push(snowflake);
                 }
+
+                requestAnimationFrame(() => this.animate());
+            }
+
+            cleanup() {
+                setInterval(() => {
+                    if (!this.container) return;
+                    
+                    this.snowflakes = this.snowflakes.filter(snowflake => {
+                        const rect = snowflake.element.getBoundingClientRect();
+                        if (rect.top > window.innerHeight) {
+                            this.container.removeChild(snowflake.element);
+                            return false;
+                        }
+                        return true;
+                    });
+                }, 1000);
             }
         }
 
-        // Initialize when the DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => new FireworksManager());
-        } else {
-            new FireworksManager();
-        }
-    })();
-    </script>
-</body>
-</html>
+        // Initialize with a slight delay to ensure DOM is fully ready
+        setTimeout(() => {
+            if (document.body) {
+                new SnowfallManager();
+            }
+        }, 100);
+        
+    }, 100);
+});
