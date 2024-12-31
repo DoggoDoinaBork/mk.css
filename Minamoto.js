@@ -1,90 +1,16 @@
-<!DOCTYPE html>
-<html>
-<head>
-    <title>Fireworks Animation</title>
-    <style>
-        body {
-            margin: 0;
-            min-height: 100vh;
-            background: #000;
-            overflow: hidden;
-            cursor: pointer;
+(function() {
+    function initFireworks() {
+        if (!document || !document.body) {
+            console.warn('DOM not ready, retrying in 100ms...');
+            setTimeout(initFireworks, 100);
+            return;
         }
-        .content {
-            position: fixed;
-            top: 50%;
-            left: 50%;
-            transform: translate(-50%, -50%);
-            color: white;
-            font-family: Arial, sans-serif;
-            text-align: center;
-            pointer-events: none;
-            opacity: 0.7;
-        }
-    </style>
-</head>
-<body>
-    <div class="content">
-        <h1>✨ Click Anywhere for Fireworks! ✨</h1>
-    </div>
 
-    <script>
-    (function() {
-        class Particle {
-            constructor(x, y, color) {
-                this.x = x;
-                this.y = y;
-                this.color = color;
+        class Spark {
+            constructor(container, x, y) {
+                this.container = container;
                 this.element = document.createElement('div');
-                this.element.style.cssText = `
-                    position: fixed;
-                    width: 4px;
-                    height: 4px;
-                    background: ${color};
-                    border-radius: 50%;
-                    pointer-events: none;
-                    transform: translate(${x}px, ${y}px);
-                    transition: transform 0.02s linear;
-                `;
-                
-                // Random velocity in all directions
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 2 + Math.random() * 6;
-                this.vx = Math.cos(angle) * speed;
-                this.vy = Math.sin(angle) * speed;
-                
-                // Gravity and fade effects
-                this.gravity = 0.12;
-                this.life = 1;
-                this.decay = 0.015 + Math.random() * 0.015;
-            }
-
-            update() {
-                this.life -= this.decay;
-                if (this.life <= 0) return false;
-
-                // Apply gravity and velocity
-                this.vy += this.gravity;
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Update position and opacity
-                this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
-                this.element.style.opacity = this.life;
-
-                return true;
-            }
-        }
-
-        class Firework {
-            constructor(x, y) {
-                this.x = x;
-                this.y = y;
-                this.particles = [];
-                this.container = document.createElement('div');
-                this.container.style.position = 'fixed';
-                this.container.style.zIndex = '1000';
-                document.body.appendChild(this.container);
+                this.element.className = 'spark';
                 
                 this.colors = [
                     '#ff0000', // Red
@@ -97,94 +23,172 @@
                     '#daa520'  // Golden
                 ];
 
-                this.explode();
-            }
-
-            explode() {
-                const color = this.colors[Math.floor(Math.random() * this.colors.length)];
-                const particleCount = 50 + Math.floor(Math.random() * 30);
-
-                for (let i = 0; i < particleCount; i++) {
-                    const particle = new Particle(this.x, this.y, color);
-                    this.container.appendChild(particle.element);
-                    this.particles.push(particle);
+                this.element.style.cssText = `
+                    position: fixed;
+                    width: 4px;
+                    height: 4px;
+                    border-radius: 50%;
+                    user-select: none;
+                    z-index: 99999;
+                    pointer-events: none;
+                    transition: transform 0.02s linear;
+                `;
+                
+                if (this.container && this.container.appendChild) {
+                    this.container.appendChild(this.element);
+                    this.reset(x, y);
                 }
             }
 
-            update() {
-                this.particles = this.particles.filter(particle => {
-                    const alive = particle.update();
-                    if (!alive) {
-                        this.container.removeChild(particle.element);
-                    }
-                    return alive;
-                });
+            reset(x, y) {
+                if (!this.element) return;
+                
+                // Position
+                this.x = x;
+                this.y = y;
+                
+                // Random velocity in all directions
+                const angle = Math.random() * Math.PI * 2;
+                const speed = 2 + Math.random() * 6;
+                this.vx = Math.cos(angle) * speed;
+                this.vy = Math.sin(angle) * speed;
+                
+                // Physics properties
+                this.gravity = 0.12;
+                this.life = 1;
+                this.decay = 0.015 + Math.random() * 0.015;
+                
+                // Visual properties
+                const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
+                this.element.style.backgroundColor = randomColor;
+                this.element.style.opacity = this.life;
+                
+                this.updatePosition();
+            }
 
-                if (this.particles.length === 0) {
-                    document.body.removeChild(this.container);
-                    return false;
-                }
+            updatePosition() {
+                if (!this.element) return;
+                this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
+            }
+
+            move() {
+                if (!this.element) return false;
+
+                // Update life
+                this.life -= this.decay;
+                if (this.life <= 0) return false;
+
+                // Apply physics
+                this.vy += this.gravity;
+                this.x += this.vx;
+                this.y += this.vy;
+
+                // Update visual properties
+                this.element.style.opacity = this.life;
+                this.updatePosition();
+
                 return true;
             }
         }
 
         class FireworksManager {
             constructor() {
-                this.fireworks = [];
-                this.isAnimating = false;
-                this.setupEventListeners();
-                this.autoLaunchInterval = null;
-                this.startAutoLaunch();
+                this.sparks = [];
+                this.maxSparks = 500;
+                this.sparkCount = 50; // Sparks per explosion
+                
+                this.setupContainer();
+                
+                if (this.container) {
+                    this.setupEventListeners();
+                    this.startAutoLaunch();
+                    this.animate();
+                }
+            }
+
+            setupContainer() {
+                try {
+                    if (!document.body) throw new Error('Document body not found');
+                    
+                    const existingContainer = document.getElementById('fireworks-container');
+                    if (existingContainer) {
+                        existingContainer.remove();
+                    }
+
+                    this.container = document.createElement('div');
+                    this.container.id = 'fireworks-container';
+                    this.container.style.cssText = `
+                        position: fixed;
+                        top: 0;
+                        left: 0;
+                        width: 100vw;
+                        height: 100vh;
+                        pointer-events: none;
+                        z-index: 99999;
+                    `;
+                    
+                    document.body.appendChild(this.container);
+                } catch (error) {
+                    console.error('Error setting up fireworks container:', error);
+                    this.container = null;
+                }
             }
 
             setupEventListeners() {
                 document.addEventListener('click', (e) => {
-                    this.createFirework(e.clientX, e.clientY);
+                    this.createExplosion(e.clientX, e.clientY);
                 });
 
                 document.addEventListener('touchstart', (e) => {
                     e.preventDefault();
                     const touch = e.touches[0];
-                    this.createFirework(touch.clientX, touch.clientY);
+                    this.createExplosion(touch.clientX, touch.clientY);
                 });
             }
 
-            createFirework(x, y) {
-                const firework = new Firework(x, y);
-                this.fireworks.push(firework);
-                
-                if (!this.isAnimating) {
-                    this.isAnimating = true;
-                    this.animate();
-                }
-            }
-
             startAutoLaunch() {
-                this.autoLaunchInterval = setInterval(() => {
+                setInterval(() => {
                     const x = Math.random() * window.innerWidth;
                     const y = Math.random() * (window.innerHeight * 0.7);
-                    this.createFirework(x, y);
+                    this.createExplosion(x, y);
                 }, 2000);
             }
 
-            animate() {
-                this.fireworks = this.fireworks.filter(firework => firework.update());
-
-                if (this.fireworks.length > 0) {
-                    requestAnimationFrame(() => this.animate());
-                } else {
-                    this.isAnimating = false;
+            createExplosion(x, y) {
+                // Only create new sparks if we're under the limit
+                if (this.sparks.length < this.maxSparks) {
+                    const sparkCount = Math.min(
+                        this.sparkCount,
+                        this.maxSparks - this.sparks.length
+                    );
+                    
+                    for (let i = 0; i < sparkCount; i++) {
+                        this.sparks.push(new Spark(this.container, x, y));
+                    }
                 }
+            }
+
+            animate() {
+                if (!this.container) return;
+
+                this.sparks = this.sparks.filter(spark => {
+                    const isAlive = spark.move();
+                    if (!isAlive && this.container.contains(spark.element)) {
+                        this.container.removeChild(spark.element);
+                    }
+                    return isAlive;
+                });
+
+                requestAnimationFrame(() => this.animate());
             }
         }
 
-        // Initialize when the DOM is ready
-        if (document.readyState === 'loading') {
-            document.addEventListener('DOMContentLoaded', () => new FireworksManager());
-        } else {
-            new FireworksManager();
-        }
-    })();
-    </script>
-</body>
-</html>
+        return new FireworksManager();
+    }
+
+    if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', initFireworks);
+    } else {
+        initFireworks();
+    }
+})();
