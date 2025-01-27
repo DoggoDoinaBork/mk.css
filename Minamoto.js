@@ -1,107 +1,105 @@
 (function() {
-    function initSnowfall() {
+    function initHeartAnimation() {
         if (!document || !document.body) {
             console.warn('DOM not ready, retrying in 100ms...');
-            setTimeout(initSnowfall, 100);
+            setTimeout(initHeartAnimation, 100);
             return;
         }
 
-        class Snowflake {
+        class Heart {
             constructor(container) {
                 this.container = container;
                 this.element = document.createElement('div');
-                this.element.className = 'snowflake';
+                this.element.className = 'heart';
                 
-                this.colors = [
-                    '#ffffff', // White
-                    '#00fff2', // Light Blue
-                    '#89CFF0', // Baby Blue
-                    '#defcf9', // Ice Blue
-                    '#9fb4ff', // Light Purple
-                    '#ff9fb4'  // Light Pink
-                ];
-
+                // Set initial styles
                 this.element.style.cssText = `
                     position: fixed;
                     user-select: none;
                     z-index: 99999;
                     pointer-events: none;
                     transition: transform 0.1s linear;
+                    font-size: 20px;
+                    color: #ff69b4;
+                    text-shadow: 0 0 5px rgba(255, 105, 180, 0.5);
                 `;
-                this.element.innerHTML = '❄';
+                
+                this.element.innerHTML = '❤';
                 
                 if (this.container && this.container.appendChild) {
                     this.container.appendChild(this.element);
                     this.reset();
-                    this.changeColor();
                 }
-            }
-
-            changeColor() {
-                if (!this.element) return;
-                const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
-                this.element.style.color = randomColor;
-                setTimeout(() => this.changeColor(), 2000 + Math.random() * 2000);
             }
 
             reset() {
                 if (!this.element) return;
                 
-                // Initialize position and movement properties
+                // Start from bottom of screen
                 this.x = Math.random() * window.innerWidth;
-                this.y = -20;
-                const size = 10 + Math.random() * 20;
+                this.y = window.innerHeight + 20;
                 
-                // Set initial styles
+                // Set random size
+                const size = 15 + Math.random() * 20;
                 this.element.style.fontSize = `${size}px`;
-                this.element.style.opacity = (0.5 + Math.random() * 0.5).toString();
                 
-                // Movement parameters
-                this.wobbleSpeed = 0.02 + Math.random() * 0.08;
-                this.wobbleRange = Math.random() * 2 - 1;
-                this.fallSpeed = 1 + Math.random() * 2; // Slightly slower fall speed
-                this.wobblePos = Math.random() * Math.PI * 2;
+                // Set initial opacity
+                this.opacity = 0.8;
+                this.element.style.opacity = this.opacity;
                 
-                // Apply initial position
+                // Movement properties
+                this.speed = 1 + Math.random() * 2;
+                this.angle = -Math.PI/2 + (Math.random() * 0.4 - 0.2); // Mostly upward
+                this.vx = Math.cos(this.angle) * this.speed;
+                this.vy = Math.sin(this.angle) * this.speed;
+                
+                // Wobble properties
+                this.wobble = Math.random() * Math.PI * 2;
+                this.wobbleSpeed = 0.05 + Math.random() * 0.05;
+                
                 this.updatePosition();
             }
 
             updatePosition() {
                 if (!this.element) return;
-                this.element.style.transform = `translate(${this.x}px, ${this.y}px)`;
+                const wobbleX = Math.sin(this.wobble) * 2;
+                this.element.style.transform = `translate(${this.x + wobbleX}px, ${this.y}px)`;
             }
 
             move() {
                 if (!this.element) return false;
 
-                // Always update position (continuous falling)
-                this.y += this.fallSpeed;
+                // Update position
+                this.x += this.vx;
+                this.y += this.vy;
                 
-                // Update horizontal wobble
-                this.wobblePos += this.wobbleSpeed;
-                this.x += Math.sin(this.wobblePos) * this.wobbleRange;
+                // Update wobble
+                this.wobble += this.wobbleSpeed;
                 
-                // Apply new position
+                // Fade out as it rises
+                this.opacity -= 0.003;
+                this.element.style.opacity = Math.max(0, this.opacity);
+                
                 this.updatePosition();
 
-                // Check if snowflake is still in view
-                return this.y <= window.innerHeight;
+                // Remove when faded out or out of bounds
+                return (
+                    this.opacity > 0 &&
+                    this.x > -50 &&
+                    this.x < window.innerWidth + 50 &&
+                    this.y > -50
+                );
             }
         }
 
-        class SnowfallManager {
+        class HeartManager {
             constructor() {
-                this.snowflakes = [];
-                this.maxSnowflakes = 50;
-                this.isScrolling = false;
-                this.scrollTimeout = null;
-                this.baseSnowflakes = 20; // Number of snowflakes always present
-                
+                this.hearts = [];
+                this.maxHearts = 40;
                 this.setupContainer();
                 
                 if (this.container) {
-                    this.setupScrollListener();
-                    this.startSnowfall();
+                    this.startAnimation();
                 }
             }
 
@@ -109,15 +107,13 @@
                 try {
                     if (!document.body) throw new Error('Document body not found');
                     
-                    // Remove existing container if present
-                    const existingContainer = document.getElementById('snowfall-container');
+                    const existingContainer = document.getElementById('heart-container');
                     if (existingContainer) {
                         existingContainer.remove();
                     }
 
-                    // Create new container
                     this.container = document.createElement('div');
-                    this.container.id = 'snowfall-container';
+                    this.container.id = 'heart-container';
                     this.container.style.cssText = `
                         position: fixed;
                         top: 0;
@@ -130,86 +126,46 @@
                     
                     document.body.appendChild(this.container);
                 } catch (error) {
-                    console.error('Error setting up snow container:', error);
+                    console.error('Error setting up heart container:', error);
                     this.container = null;
                 }
             }
 
-            setupScrollListener() {
-                window.addEventListener('scroll', () => {
-                    // Clear existing timeout
-                    if (this.scrollTimeout) {
-                        clearTimeout(this.scrollTimeout);
+            startAnimation() {
+                // Create new hearts periodically
+                setInterval(() => {
+                    if (this.hearts.length < this.maxHearts) {
+                        this.hearts.push(new Heart(this.container));
                     }
-                    
-                    // Set scrolling state to true and spawn new snowflakes
-                    this.isScrolling = true;
-                    this.addScrollTriggeredSnowflakes();
-                    
-                    // Set timeout to stop spawning
-                    this.scrollTimeout = setTimeout(() => {
-                        this.isScrolling = false;
-                    }, 150);
-                }, { passive: true });
+                }, 300);
 
-                // Handle window resize
-                window.addEventListener('resize', () => {
-                    this.maxSnowflakes = Math.floor((window.innerWidth * window.innerHeight) / 20000);
-                    this.baseSnowflakes = Math.min(20, Math.floor(this.maxSnowflakes / 2));
-                });
-            }
-
-            startSnowfall() {
-                // Initial population of base snowflakes
-                for (let i = 0; i < this.baseSnowflakes; i++) {
-                    this.snowflakes.push(new Snowflake(this.container));
-                }
-                
-                // Start the animation loop
+                // Start animation loop
                 this.animate();
-            }
-
-            addScrollTriggeredSnowflakes() {
-                // Only add new snowflakes while scrolling and below max
-                if (this.isScrolling && this.snowflakes.length < this.maxSnowflakes) {
-                    const numToAdd = Math.min(2, this.maxSnowflakes - this.snowflakes.length);
-                    for (let i = 0; i < numToAdd; i++) {
-                        this.snowflakes.push(new Snowflake(this.container));
-                    }
-                }
             }
 
             animate() {
                 if (!this.container) return;
 
-                // Update existing snowflakes
-                this.snowflakes = this.snowflakes.filter(snowflake => {
-                    const isVisible = snowflake.move();
-                    if (!isVisible) {
-                        if (this.container.contains(snowflake.element)) {
-                            this.container.removeChild(snowflake.element);
-                        }
-                        // Only automatically replace snowflakes up to baseSnowflakes count
-                        if (this.snowflakes.length <= this.baseSnowflakes) {
-                            this.snowflakes.push(new Snowflake(this.container));
-                        }
-                        return false;
+                // Update and filter out dead hearts
+                this.hearts = this.hearts.filter(heart => {
+                    const isAlive = heart.move();
+                    if (!isAlive && this.container.contains(heart.element)) {
+                        this.container.removeChild(heart.element);
                     }
-                    return true;
+                    return isAlive;
                 });
 
-                // Continue animation loop
                 requestAnimationFrame(() => this.animate());
             }
         }
 
-        return new SnowfallManager();
+        return new HeartManager();
     }
 
-    // Start the initialization process
+    // Start the animation when the document is ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initSnowfall);
+        document.addEventListener('DOMContentLoaded', initHeartAnimation);
     } else {
-        initSnowfall();
+        initHeartAnimation();
     }
 })();
