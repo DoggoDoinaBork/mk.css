@@ -7,7 +7,7 @@
         }
 
         class Heart {
-            constructor(container) {
+            constructor(container, x, y) {
                 this.container = container;
                 this.element = document.createElement('div');
                 this.element.className = 'heart';
@@ -28,16 +28,16 @@
                 
                 if (this.container && this.container.appendChild) {
                     this.container.appendChild(this.element);
-                    this.reset();
+                    this.reset(x, y);
                 }
             }
 
-            reset() {
+            reset(x, y) {
                 if (!this.element) return;
                 
-                // Start from bottom of screen
-                this.x = Math.random() * window.innerWidth;
-                this.y = window.innerHeight + 20;
+                // Start from click/touch position
+                this.x = x;
+                this.y = y;
                 
                 // Set random size
                 const size = 15 + Math.random() * 20;
@@ -47,11 +47,14 @@
                 this.opacity = 0.8;
                 this.element.style.opacity = this.opacity;
                 
-                // Movement properties
-                this.speed = 1 + Math.random() * 2;
-                this.angle = -Math.PI/2 + (Math.random() * 0.4 - 0.2); // Mostly upward
+                // Movement properties - create a burst effect
+                this.speed = 3 + Math.random() * 4;
+                this.angle = Math.random() * Math.PI * 2; // Random direction
                 this.vx = Math.cos(this.angle) * this.speed;
                 this.vy = Math.sin(this.angle) * this.speed;
+                
+                // Add gravity effect
+                this.gravity = 0.1;
                 
                 // Wobble properties
                 this.wobble = Math.random() * Math.PI * 2;
@@ -73,11 +76,17 @@
                 this.x += this.vx;
                 this.y += this.vy;
                 
+                // Apply gravity
+                this.vy += this.gravity;
+                
+                // Slow down horizontal movement
+                this.vx *= 0.99;
+                
                 // Update wobble
                 this.wobble += this.wobbleSpeed;
                 
-                // Fade out as it rises
-                this.opacity -= 0.003;
+                // Fade out gradually
+                this.opacity -= 0.01;
                 this.element.style.opacity = Math.max(0, this.opacity);
                 
                 this.updatePosition();
@@ -87,7 +96,7 @@
                     this.opacity > 0 &&
                     this.x > -50 &&
                     this.x < window.innerWidth + 50 &&
-                    this.y > -50
+                    this.y < window.innerHeight + 50
                 );
             }
         }
@@ -95,11 +104,12 @@
         class HeartManager {
             constructor() {
                 this.hearts = [];
-                this.maxHearts = 40;
+                this.maxHearts = 100;
                 this.setupContainer();
                 
                 if (this.container) {
-                    this.startAnimation();
+                    this.setupEventListeners();
+                    this.animate();
                 }
             }
 
@@ -131,16 +141,28 @@
                 }
             }
 
-            startAnimation() {
-                // Create new hearts periodically
-                setInterval(() => {
-                    if (this.hearts.length < this.maxHearts) {
-                        this.hearts.push(new Heart(this.container));
-                    }
-                }, 300);
+            setupEventListeners() {
+                // Mouse click handler
+                document.addEventListener('click', (e) => {
+                    this.createHeartBurst(e.clientX, e.clientY);
+                });
 
-                // Start animation loop
-                this.animate();
+                // Touch handler
+                document.addEventListener('touchstart', (e) => {
+                    e.preventDefault();
+                    const touch = e.touches[0];
+                    this.createHeartBurst(touch.clientX, touch.clientY);
+                });
+            }
+
+            createHeartBurst(x, y) {
+                // Create multiple hearts for a burst effect
+                const burstCount = 8 + Math.floor(Math.random() * 5);
+                for (let i = 0; i < burstCount; i++) {
+                    if (this.hearts.length < this.maxHearts) {
+                        this.hearts.push(new Heart(this.container, x, y));
+                    }
+                }
             }
 
             animate() {
@@ -162,7 +184,7 @@
         return new HeartManager();
     }
 
-    // Start the animation when the document is ready
+    // Start when the document is ready
     if (document.readyState === 'loading') {
         document.addEventListener('DOMContentLoaded', initHeartAnimation);
     } else {
