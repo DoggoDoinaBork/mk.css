@@ -1,68 +1,68 @@
 (function() {
-    function initFireworks() {
+    function initSnowfall() {
         if (!document || !document.body) {
             console.warn('DOM not ready, retrying in 100ms...');
-            setTimeout(initFireworks, 100);
+            setTimeout(initSnowfall, 100);
             return;
         }
 
-        class Spark {
-            constructor(container, x, y) {
+        class Snowflake {
+            constructor(container) {
                 this.container = container;
                 this.element = document.createElement('div');
-                this.element.className = 'spark';
+                this.element.className = 'snowflake';
                 
                 this.colors = [
-                    '#ff0000', // Red
-                    '#ffa500', // Orange
-                    '#ffff00', // Yellow
-                    '#00ff00', // Green
-                    '#00ffff', // Cyan
-                    '#ff00ff', // Magenta
-                    '#ff69b4', // Pink
-                    '#daa520'  // Golden
+                    '#ffffff', // White
+                    '#00fff2', // Light Blue
+                    '#89CFF0', // Baby Blue
+                    '#defcf9', // Ice Blue
+                    '#9fb4ff', // Light Purple
+                    '#ff9fb4'  // Light Pink
                 ];
 
                 this.element.style.cssText = `
                     position: fixed;
-                    width: 4px;
-                    height: 4px;
-                    border-radius: 50%;
                     user-select: none;
                     z-index: 99999;
                     pointer-events: none;
-                    transition: transform 0.02s linear;
+                    transition: transform 0.1s linear;
                 `;
+                this.element.innerHTML = '❄';
                 
                 if (this.container && this.container.appendChild) {
                     this.container.appendChild(this.element);
-                    this.reset(x, y);
+                    this.reset();
+                    this.changeColor();
                 }
             }
 
-            reset(x, y) {
+            changeColor() {
+                if (!this.element) return;
+                const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
+                this.element.style.color = randomColor;
+                setTimeout(() => this.changeColor(), 2000 + Math.random() * 2000);
+            }
+
+            reset() {
                 if (!this.element) return;
                 
-                // Position
-                this.x = x;
-                this.y = y;
+                // Initialize position and movement properties
+                this.x = Math.random() * window.innerWidth;
+                this.y = -20;
+                const size = 10 + Math.random() * 20;
                 
-                // Random velocity in all directions
-                const angle = Math.random() * Math.PI * 2;
-                const speed = 2 + Math.random() * 6;
-                this.vx = Math.cos(angle) * speed;
-                this.vy = Math.sin(angle) * speed;
+                // Set initial styles
+                this.element.style.fontSize = `${size}px`;
+                this.element.style.opacity = (0.5 + Math.random() * 0.5).toString();
                 
-                // Physics properties
-                this.gravity = 0.12;
-                this.life = 1;
-                this.decay = 0.015 + Math.random() * 0.015;
+                // Movement parameters
+                this.wobbleSpeed = 0.02 + Math.random() * 0.08;
+                this.wobbleRange = Math.random() * 2 - 1;
+                this.fallSpeed = 1 + Math.random() * 2; // Slightly slower fall speed
+                this.wobblePos = Math.random() * Math.PI * 2;
                 
-                // Visual properties
-                const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
-                this.element.style.backgroundColor = randomColor;
-                this.element.style.opacity = this.life;
-                
+                // Apply initial position
                 this.updatePosition();
             }
 
@@ -74,35 +74,34 @@
             move() {
                 if (!this.element) return false;
 
-                // Update life
-                this.life -= this.decay;
-                if (this.life <= 0) return false;
-
-                // Apply physics
-                this.vy += this.gravity;
-                this.x += this.vx;
-                this.y += this.vy;
-
-                // Update visual properties
-                this.element.style.opacity = this.life;
+                // Always update position (continuous falling)
+                this.y += this.fallSpeed;
+                
+                // Update horizontal wobble
+                this.wobblePos += this.wobbleSpeed;
+                this.x += Math.sin(this.wobblePos) * this.wobbleRange;
+                
+                // Apply new position
                 this.updatePosition();
 
-                return true;
+                // Check if snowflake is still in view
+                return this.y <= window.innerHeight;
             }
         }
 
-        class FireworksManager {
+        class SnowfallManager {
             constructor() {
-                this.sparks = [];
-                this.maxSparks = 500;
-                this.sparkCount = 50; // Sparks per explosion
+                this.snowflakes = [];
+                this.maxSnowflakes = 50;
+                this.isScrolling = false;
+                this.scrollTimeout = null;
+                this.baseSnowflakes = 20; // Number of snowflakes always present
                 
                 this.setupContainer();
                 
                 if (this.container) {
-                    this.setupEventListeners();
-                    this.startAutoLaunch();
-                    this.animate();
+                    this.setupScrollListener();
+                    this.startSnowfall();
                 }
             }
 
@@ -110,13 +109,15 @@
                 try {
                     if (!document.body) throw new Error('Document body not found');
                     
-                    const existingContainer = document.getElementById('fireworks-container');
+                    // Remove existing container if present
+                    const existingContainer = document.getElementById('snowfall-container');
                     if (existingContainer) {
                         existingContainer.remove();
                     }
 
+                    // Create new container
                     this.container = document.createElement('div');
-                    this.container.id = 'fireworks-container';
+                    this.container.id = 'snowfall-container';
                     this.container.style.cssText = `
                         position: fixed;
                         top: 0;
@@ -129,41 +130,51 @@
                     
                     document.body.appendChild(this.container);
                 } catch (error) {
-                    console.error('Error setting up fireworks container:', error);
+                    console.error('Error setting up snow container:', error);
                     this.container = null;
                 }
             }
 
-            setupEventListeners() {
-                document.addEventListener('click', (e) => {
-                    this.createExplosion(e.clientX, e.clientY);
-                });
-
-                document.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
-                    const touch = e.touches[0];
-                    this.createExplosion(touch.clientX, touch.clientY);
-                });
-            }
-
-            startAutoLaunch() {
-                setInterval(() => {
-                    const x = Math.random() * window.innerWidth;
-                    const y = Math.random() * (window.innerHeight * 0.7);
-                    this.createExplosion(x, y);
-                }, 2000);
-            }
-
-            createExplosion(x, y) {
-                // Only create new sparks if we're under the limit
-                if (this.sparks.length < this.maxSparks) {
-                    const sparkCount = Math.min(
-                        this.sparkCount,
-                        this.maxSparks - this.sparks.length
-                    );
+            setupScrollListener() {
+                window.addEventListener('scroll', () => {
+                    // Clear existing timeout
+                    if (this.scrollTimeout) {
+                        clearTimeout(this.scrollTimeout);
+                    }
                     
-                    for (let i = 0; i < sparkCount; i++) {
-                        this.sparks.push(new Spark(this.container, x, y));
+                    // Set scrolling state to true and spawn new snowflakes
+                    this.isScrolling = true;
+                    this.addScrollTriggeredSnowflakes();
+                    
+                    // Set timeout to stop spawning
+                    this.scrollTimeout = setTimeout(() => {
+                        this.isScrolling = false;
+                    }, 150);
+                }, { passive: true });
+
+                // Handle window resize
+                window.addEventListener('resize', () => {
+                    this.maxSnowflakes = Math.floor((window.innerWidth * window.innerHeight) / 20000);
+                    this.baseSnowflakes = Math.min(20, Math.floor(this.maxSnowflakes / 2));
+                });
+            }
+
+            startSnowfall() {
+                // Initial population of base snowflakes
+                for (let i = 0; i < this.baseSnowflakes; i++) {
+                    this.snowflakes.push(new Snowflake(this.container));
+                }
+                
+                // Start the animation loop
+                this.animate();
+            }
+
+            addScrollTriggeredSnowflakes() {
+                // Only add new snowflakes while scrolling and below max
+                if (this.isScrolling && this.snowflakes.length < this.maxSnowflakes) {
+                    const numToAdd = Math.min(2, this.maxSnowflakes - this.snowflakes.length);
+                    for (let i = 0; i < numToAdd; i++) {
+                        this.snowflakes.push(new Snowflake(this.container));
                     }
                 }
             }
@@ -171,24 +182,34 @@
             animate() {
                 if (!this.container) return;
 
-                this.sparks = this.sparks.filter(spark => {
-                    const isAlive = spark.move();
-                    if (!isAlive && this.container.contains(spark.element)) {
-                        this.container.removeChild(spark.element);
+                // Update existing snowflakes
+                this.snowflakes = this.snowflakes.filter(snowflake => {
+                    const isVisible = snowflake.move();
+                    if (!isVisible) {
+                        if (this.container.contains(snowflake.element)) {
+                            this.container.removeChild(snowflake.element);
+                        }
+                        // Only automatically replace snowflakes up to baseSnowflakes count
+                        if (this.snowflakes.length <= this.baseSnowflakes) {
+                            this.snowflakes.push(new Snowflake(this.container));
+                        }
+                        return false;
                     }
-                    return isAlive;
+                    return true;
                 });
 
+                // Continue animation loop
                 requestAnimationFrame(() => this.animate());
             }
         }
 
-        return new FireworksManager();
+        return new SnowfallManager();
     }
 
+    // Start the initialization process
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initFireworks);
+        document.addEventListener('DOMContentLoaded', initSnowfall);
     } else {
-        initFireworks();
+        initSnowfall();
     }
 })();
