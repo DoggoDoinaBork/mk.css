@@ -1,16 +1,26 @@
 (function() {
-    function initHeartAnimation() {
+    function initSakuraAnimation() {
         if (!document || !document.body) {
             console.warn('DOM not ready, retrying in 100ms...');
-            setTimeout(initHeartAnimation, 100);
+            setTimeout(initSakuraAnimation, 100);
             return;
         }
 
-        class Heart {
+        class SakuraPetal {
             constructor(container, x, y) {
                 this.container = container;
                 this.element = document.createElement('div');
-                this.element.className = 'heart';
+                this.element.className = 'sakura-petal';
+                
+                // Sakura colors
+                this.colors = [
+                    '#ffd7e8', // Light pink
+                    '#ffcce0', // Pale pink
+                    '#ffc0d9', // Medium pink
+                    '#ffb3d0', // Darker pink
+                    '#ffe0ef', // Very light pink
+                    '#fff0f7'  // Almost white pink
+                ];
                 
                 // Set initial styles
                 this.element.style.cssText = `
@@ -20,11 +30,11 @@
                     pointer-events: none;
                     transition: transform 0.1s linear;
                     font-size: 20px;
-                    color: #ff69b4;
-                    text-shadow: 0 0 5px rgba(255, 105, 180, 0.5);
+                    filter: drop-shadow(0 0 2px rgba(255, 200, 200, 0.5));
                 `;
                 
-                this.element.innerHTML = '❤';
+                // Use flower emoji as sakura
+                this.element.innerHTML = '🌸';
                 
                 if (this.container && this.container.appendChild) {
                     this.container.appendChild(this.element);
@@ -40,33 +50,46 @@
                 this.y = y;
                 
                 // Set random size
-                const size = 15 + Math.random() * 20;
+                const size = 10 + Math.random() * 20;
                 this.element.style.fontSize = `${size}px`;
                 
                 // Set initial opacity
-                this.opacity = 0.8;
+                this.opacity = 0.8 + Math.random() * 0.2;
                 this.element.style.opacity = this.opacity;
                 
-                // Movement properties - create a burst effect
-                this.speed = 3 + Math.random() * 4;
-                this.angle = Math.random() * Math.PI * 2; // Random direction
+                // Movement properties - create a gentle falling effect
+                this.speed = 1 + Math.random() * 2;
+                this.angle = Math.random() * Math.PI * 2; // Random initial direction
                 this.vx = Math.cos(this.angle) * this.speed;
                 this.vy = Math.sin(this.angle) * this.speed;
                 
-                // Add gravity effect
-                this.gravity = 0.1;
+                // Add light gravity effect
+                this.gravity = 0.05;
                 
-                // Wobble properties
+                // Add rotation
+                this.rotation = Math.random() * 360;
+                this.rotationSpeed = (Math.random() * 4) - 2;
+                
+                // Wobble properties for floating effect
                 this.wobble = Math.random() * Math.PI * 2;
-                this.wobbleSpeed = 0.05 + Math.random() * 0.05;
+                this.wobbleSpeed = 0.02 + Math.random() * 0.04;
+                this.wobbleSize = 0.5 + Math.random() * 2;
                 
+                // Update visuals
                 this.updatePosition();
+                this.updateColor();
+            }
+
+            updateColor() {
+                if (!this.element) return;
+                const randomColor = this.colors[Math.floor(Math.random() * this.colors.length)];
+                this.element.style.color = randomColor;
             }
 
             updatePosition() {
                 if (!this.element) return;
-                const wobbleX = Math.sin(this.wobble) * 2;
-                this.element.style.transform = `translate(${this.x + wobbleX}px, ${this.y}px)`;
+                const wobbleX = Math.sin(this.wobble) * this.wobbleSize;
+                this.element.style.transform = `translate(${this.x + wobbleX}px, ${this.y}px) rotate(${this.rotation}deg)`;
             }
 
             move() {
@@ -76,17 +99,19 @@
                 this.x += this.vx;
                 this.y += this.vy;
                 
-                // Apply gravity
+                // Apply gentle gravity
                 this.vy += this.gravity;
                 
-                // Slow down horizontal movement
+                // Add resistance/drag
                 this.vx *= 0.99;
+                this.vy *= 0.99;
                 
-                // Update wobble
+                // Update wobble and rotation
                 this.wobble += this.wobbleSpeed;
+                this.rotation += this.rotationSpeed;
                 
                 // Fade out gradually
-                this.opacity -= 0.01;
+                this.opacity -= 0.005;
                 this.element.style.opacity = Math.max(0, this.opacity);
                 
                 this.updatePosition();
@@ -101,10 +126,10 @@
             }
         }
 
-        class HeartManager {
+        class SakuraManager {
             constructor() {
-                this.hearts = [];
-                this.maxHearts = 100;
+                this.petals = [];
+                this.maxPetals = 100;
                 this.setupContainer();
                 
                 if (this.container) {
@@ -117,13 +142,13 @@
                 try {
                     if (!document.body) throw new Error('Document body not found');
                     
-                    const existingContainer = document.getElementById('heart-container');
+                    const existingContainer = document.getElementById('sakura-container');
                     if (existingContainer) {
                         existingContainer.remove();
                     }
 
                     this.container = document.createElement('div');
-                    this.container.id = 'heart-container';
+                    this.container.id = 'sakura-container';
                     this.container.style.cssText = `
                         position: fixed;
                         top: 0;
@@ -136,7 +161,7 @@
                     
                     document.body.appendChild(this.container);
                 } catch (error) {
-                    console.error('Error setting up heart container:', error);
+                    console.error('Error setting up sakura container:', error);
                     this.container = null;
                 }
             }
@@ -144,35 +169,51 @@
             setupEventListeners() {
                 // Mouse click handler
                 document.addEventListener('click', (e) => {
-                    this.createHeartBurst(e.clientX, e.clientY);
+                    this.createSakuraBurst(e.clientX, e.clientY);
                 });
 
                 // Touch handler
                 document.addEventListener('touchstart', (e) => {
-                    e.preventDefault();
                     const touch = e.touches[0];
-                    this.createHeartBurst(touch.clientX, touch.clientY);
+                    this.createSakuraBurst(touch.clientX, touch.clientY);
+                });
+
+                // Mousemove for gentle trailing effect (less frequent)
+                let lastMoveTime = 0;
+                document.addEventListener('mousemove', (e) => {
+                    const now = Date.now();
+                    if (now - lastMoveTime > 150) { // Limit to prevent too many petals
+                        this.createSakuraSingle(e.clientX, e.clientY);
+                        lastMoveTime = now;
+                    }
                 });
             }
 
-            createHeartBurst(x, y) {
-                // Create multiple hearts for a burst effect
-                const burstCount = 8 + Math.floor(Math.random() * 5);
+            createSakuraBurst(x, y) {
+                // Create multiple petals for a burst effect
+                const burstCount = 10 + Math.floor(Math.random() * 10);
                 for (let i = 0; i < burstCount; i++) {
-                    if (this.hearts.length < this.maxHearts) {
-                        this.hearts.push(new Heart(this.container, x, y));
+                    if (this.petals.length < this.maxPetals) {
+                        this.petals.push(new SakuraPetal(this.container, x, y));
                     }
+                }
+            }
+
+            createSakuraSingle(x, y) {
+                // Create a single petal on mouse move
+                if (this.petals.length < this.maxPetals) {
+                    this.petals.push(new SakuraPetal(this.container, x, y));
                 }
             }
 
             animate() {
                 if (!this.container) return;
 
-                // Update and filter out dead hearts
-                this.hearts = this.hearts.filter(heart => {
-                    const isAlive = heart.move();
-                    if (!isAlive && this.container.contains(heart.element)) {
-                        this.container.removeChild(heart.element);
+                // Update and filter out dead petals
+                this.petals = this.petals.filter(petal => {
+                    const isAlive = petal.move();
+                    if (!isAlive && this.container.contains(petal.element)) {
+                        this.container.removeChild(petal.element);
                     }
                     return isAlive;
                 });
@@ -181,13 +222,13 @@
             }
         }
 
-        return new HeartManager();
+        return new SakuraManager();
     }
 
     // Start when the document is ready
     if (document.readyState === 'loading') {
-        document.addEventListener('DOMContentLoaded', initHeartAnimation);
+        document.addEventListener('DOMContentLoaded', initSakuraAnimation);
     } else {
-        initHeartAnimation();
+        initSakuraAnimation();
     }
 })();
