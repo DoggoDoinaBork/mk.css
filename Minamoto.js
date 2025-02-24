@@ -177,16 +177,6 @@
                     const touch = e.touches[0];
                     this.createSakuraBurst(touch.clientX, touch.clientY);
                 });
-
-                // Mousemove for gentle trailing effect (less frequent)
-                let lastMoveTime = 0;
-                document.addEventListener('mousemove', (e) => {
-                    const now = Date.now();
-                    if (now - lastMoveTime > 150) { // Limit to prevent too many petals
-                        this.createSakuraSingle(e.clientX, e.clientY);
-                        lastMoveTime = now;
-                    }
-                });
             }
 
             createSakuraBurst(x, y) {
